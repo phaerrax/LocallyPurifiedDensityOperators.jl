@@ -24,6 +24,11 @@ Base.isassigned(v::LPDO, n...) = isassigned(data(v), n...)
 Base.eachindex(v::LPDO) = CartesianIndices(data(v))
 Base.length(v::LPDO) = size(data(v), 1)
 
+# Needed for methods like `findall` which otherwise return the wrong indices.
+Base.keys(v::LPDO) = keys(data(v))
+Base.pairs(v::LPDO) = pairs(data(v))
+Base.values(v::LPDO) = values(data(v))
+
 # No empty constructor can be defined if we want to use matrices to store the data: arrays
 # with dimension > 1 cannot be resized, so we'd need to specify the size at construction.
 
@@ -289,7 +294,69 @@ function LinearAlgebra.tr(v::LPDO)
     r = ITensors.OneITensor()
     s = siteinds(v)
     for i in 1:length(v)
-        r *= v[i, 1] * v[i, 2] * delta(dag(s[i]),s[i]')
+        r *= v[i, 1] * v[i, 2] * delta(dag(s[i]), s[i]')
     end
     return scalar(r)
 end
+
+# Iteration utilities
+# -------------------
+
+# Traverse the LPDO starting from (1,1) and following the optimal contraction path.
+#
+#      1  2  3  4  5
+#
+#  1   ▒  ▒  ▒  ▒  ▒
+#      │ ↗│ ↗│ ↗│ ↗│
+#      ↓╱ ↓╱ ↓╱ ↓╱ ↓
+#  2   ▒  ▒  ▒  ▒  ▒
+
+function oppositesite(j::CartesianIndex{2})
+    # Return the site index on the other side of the LPDO:
+    #   (n, 1) ↦ (n, 2)
+    #   (n, 2) ↦ (n, 1)
+    if j[2] == 1
+        return CartesianIndex(j[1], 2)
+    elseif j[2] == 2
+        return CartesianIndex(j[1], 1)
+    else
+        throw(error("invalid CartesianIndex: second element not 1 or 2"))
+    end
+end
+
+function nextsite(j::CartesianIndex{2})
+    # Return the next site index of the LPDO (without checking bounds):
+    #   (n, k) ↦ (n+1, k)
+    return j .+ CartesianIndex(1, 0)
+end
+
+Base.iterate(v::LPDO) = (v[1, 1], CartesianIndex(1, 1))
+function Base.iterate(v::LPDO, state::CartesianIndex{2})
+    return if state == CartesianIndex(length(v), 2)
+        nothing
+    elseif state[2] == 1  # move to the opposite site
+        (v[oppositesite(state)], oppositesite(state))
+    elseif state[2] == 2  # move to the opposite site and to the next site
+        (v[nextsite(oppositesite(state))], nextsite(oppositesite(state)))
+    end
+end
+
+"""
+    findsite(v::LPDO, is)
+
+Return the first site of the LPDO that has at least one Index in common with the Index or
+collection of indices `is`.
+
+To find all sites with common indices with `is`, use the `findsites` function.
+"""
+ITensorMPS.findsite(v::LPDO, is) = findfirst(hascommoninds(is), v)
+ITensorMPS.findsite(v::LPDO, s::Index) = findsite(v, IndexSet(s))
+
+"""
+    findsites(v:LPDO, is)
+
+Return the sites of the LPDO that have indices in common with the collection of site indices
+`is`.
+"""
+ITensorMPS.findsites(v::LPDO, is) = findall(hascommoninds(is), v)
+ITensorMPS.findsites(v::LPDO, s::Index) = findsites(v, IndexSet(s))
