@@ -18,9 +18,10 @@ ITensors.data(v::LPDO) = v.data
 # Utility functions, adapted from the AbstractMPS equivalent methods
 Base.getindex(v::LPDO, n...) = getindex(data(v), n...)
 Base.isassigned(v::LPDO, n...) = isassigned(data(v), n...)
+# These methods also automagically work with a CartesianIndex instead of two Integers, i.e.
+#   v[CartesianIndex(1,2)]
 
 Base.eachindex(v::LPDO) = CartesianIndices(data(v))
-
 Base.length(v::LPDO) = size(data(v), 1)
 
 # No empty constructor can be defined if we want to use matrices to store the data: arrays
@@ -128,8 +129,10 @@ end
 
 LPDO(sites::Vector{<:Index}, args...; kwargs...) = LPDO(Float64, sites, args...; kwargs...)
 
-function Base.setindex!(v::LPDO, T::ITensor, n::Integer)
-    data(v)[n] = T
+function Base.setindex!(v::LPDO, T::ITensor, n...)
+    # This also automagically works with a CartesianIndex instead of two Integers, i.e.
+    #   v[CartesianIndex(1,2)]
+    data(v)[n...] = T
     return v
 end
 
@@ -268,11 +271,11 @@ function vlinkinds(v::LPDO; kwargs...)
 end
 
 function hlinkind(v::LPDO, j::CartesianIndex{2}; kwargs...)
-    return commonind(v[j], v[j + CartesianIndex(1,0)]; kwargs...)
+    return commonind(v[j], v[j + CartesianIndex(1, 0)]; kwargs...)
 end
 
 function hlinkind(v::LPDO, j1::Integer, j2::Integer; kwargs...)
-    return hlinkind(v, CartesianIndex(j1,j2); kwargs...)
+    return hlinkind(v, CartesianIndex(j1, j2); kwargs...)
 end
 
 function hlinkinds(v::LPDO; kwargs...)
