@@ -183,10 +183,28 @@ Construct an LPDO representing the pure state ``|x⟩⟨x|``.
 """
 function LPDO(x::MPS)
     xnorm = norm(x)
-    N=length(x)
+    N = length(x)
     lpdo_data = Matrix{ITensor}(undef, N, 2)
     lpdo_data[:, 1] = x.data
-    lpdo_data[:, 2] = dag(x').data
+    lpdo_data[:, 2] = dag(x'; allow_alias=false).data  # we need a copy of `x` here
+
+    # Now the [:, 2] part of the matrix has, as link indices, the primed versions of the
+    # link indices of the [:, 1] part. This can be catastrophically bad when we want to
+    # prime/unprime and contract tensors from the LPDO with other tensors, so we need to
+    # replace these primed link indices with a new set.
+    hspaces = space.(linkinds(x))
+    newhlinkinds = [Index(hspaces[i], "Link,l=$i") for i in 1:(N - 1)]
+    # (We will rename later with the proper "hLink" tag.)
+    for n in 1:(N - 1)  # forward direction
+        t = lpdo_data[n, 2]
+        old_ind = only(inds(t; tags="Link,l=$n", plev=1))
+        replaceind!(t, old_ind, dag(newhlinkinds[n]))
+    end
+    for n in 2:N  # backward direction
+        t = lpdo_data[n, 2]
+        old_ind = only(inds(t; tags="Link,l=$(n-1)", plev=1))
+        replaceind!(t, old_ind, newhlinkinds[n - 1])
+    end
 
     vspaces = if hasqns(x)
         [[QN() => 1] for _ in 1:N]
