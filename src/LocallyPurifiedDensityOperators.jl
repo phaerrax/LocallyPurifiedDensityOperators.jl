@@ -2,7 +2,7 @@ module LocallyPurifiedDensityOperators
 
 using ITensors, ITensorMPS
 
-export LPDO
+export LPDO, hlinkinds, hlinkind, vlinkinds, vlinkind
 include("lpdo.jl")
 
 end
