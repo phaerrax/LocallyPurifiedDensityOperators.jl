@@ -1,6 +1,6 @@
 name = "LocallyPurifiedDensityOperators"
 uuid = "b344c096-2e8c-4725-a780-ea846911edde"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Davide Ferracin <davide.ferracin@protonmail.com>"]
 
 [deps]
